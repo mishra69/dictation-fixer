@@ -254,16 +254,6 @@
       color: var(--text-dim);
     }
 
-    .copy-badge {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--success);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .copy-badge.visible { opacity: 1; }
-
     .output-box {
       background: var(--surface);
       border: 1.5px solid var(--surface2);
@@ -283,6 +273,24 @@
       -webkit-user-select: text;
       user-select: text;
     }
+
+    #copyBtn {
+      width: 100%;
+      padding: 13px;
+      background: var(--surface2);
+      color: var(--text);
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      display: none;
+    }
+
+    #copyBtn:active { transform: scale(0.97); }
+    #copyBtn.success { background: var(--success); color: #000; }
 
     .output-box:hover { border-color: var(--accent-dim); }
 
@@ -451,16 +459,14 @@
   <div class="output-section">
     <div class="output-header">
       <span class="output-label">Corrected</span>
-      <span class="copy-badge" id="copyBadge" aria-live="polite">Copied!</span>
     </div>
     <div
       class="output-box empty"
       id="output"
       role="region"
       aria-label="Corrected text"
-      tabindex="0"
-      title="Tap to copy"
     >Corrected text will appear here…</div>
+    <button id="copyBtn" aria-label="Copy corrected text">Copy</button>
   </div>
 
   <!-- DIFF VIEW -->
@@ -632,9 +638,9 @@ const PROVIDERS = {
   const fixBtn         = document.getElementById('fixBtn');
   const outputBox      = document.getElementById('output');
   const errorToast     = document.getElementById('errorToast');
-  const copyBadge      = document.getElementById('copyBadge');
   const diffSection    = document.getElementById('diffSection');
   const diffView       = document.getElementById('diffView');
+  const copyBtn        = document.getElementById('copyBtn');
 
   // Session-only state (never persisted)
   let currentKey = '';
@@ -688,7 +694,6 @@ const PROVIDERS = {
       displayOutput(corrected);
       renderDiff(text, corrected);
       clearInput();
-      await copyToClipboard(corrected);
     } catch (err) {
       showError(err.message || 'An error occurred. Check your API key and try again.');
     } finally {
@@ -696,13 +701,16 @@ const PROVIDERS = {
     }
   }
 
-  // ── Output & copy ────────────────────────────────────────
+  // ── Output ───────────────────────────────────────────────
   function displayOutput(text) {
     outputBox.textContent = text;
     outputBox.classList.remove('empty', 'highlight');
     void outputBox.offsetWidth; // reflow for animation
     outputBox.classList.add('highlight');
     setTimeout(() => outputBox.classList.remove('highlight'), 1200);
+    copyBtn.style.display = 'block';
+    copyBtn.textContent = 'Copy';
+    copyBtn.classList.remove('success');
   }
 
   // ── Clear input ───────────────────────────────────────────
@@ -723,12 +731,14 @@ const PROVIDERS = {
     diffSection.classList.remove('hidden');
   }
 
-  async function copyToClipboard(text) {
+  // ── Copy button ───────────────────────────────────────────
+  copyBtn.addEventListener('click', async () => {
+    const text = outputBox.textContent;
+    if (!text || outputBox.classList.contains('empty')) return;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(text);
       } else {
-        // Fallback for older Safari
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
@@ -737,24 +747,17 @@ const PROVIDERS = {
         document.execCommand('copy');
         document.body.removeChild(ta);
       }
-      showCopyBadge();
+      copyBtn.textContent = 'Copied!';
+      copyBtn.classList.add('success');
+      clearTimeout(copyBadgeTimer);
+      copyBadgeTimer = setTimeout(() => {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('success');
+      }, 2000);
     } catch (_) {
-      // Clipboard can fail if document is not focused; output is still shown
-    }
-  }
-
-  outputBox.addEventListener('click', () => {
-    const text = outputBox.textContent;
-    if (text && !outputBox.classList.contains('empty')) {
-      copyToClipboard(text);
+      copyBtn.textContent = 'Copy failed — select text manually';
     }
   });
-
-  function showCopyBadge() {
-    copyBadge.classList.add('visible');
-    clearTimeout(copyBadgeTimer);
-    copyBadgeTimer = setTimeout(() => copyBadge.classList.remove('visible'), 2000);
-  }
 
   // ── Loading state ────────────────────────────────────────
   function setLoading(on) {
