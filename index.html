@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DictFix" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>DictFix – Dictation Corrector</title>
+  <script src="https://cdn.jsdelivr.net/npm/diff@7/dist/diff.min.js"></script>
+
+  <!-- ============================================================
+       SVG ICON (inline data URI for home screen)
+       ============================================================ -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231a1a2e'/%3E%3Ccircle cx='50' cy='38' r='16' fill='none' stroke='%2300d4ff' stroke-width='5'/%3E%3Crect x='45' y='54' width='10' height='14' rx='2' fill='%2300d4ff'/%3E%3Cpath d='M34 60 Q34 76 50 76 Q66 76 66 60' fill='none' stroke='%2300d4ff' stroke-width='5' stroke-linecap='round'/%3E%3Crect x='46' y='76' width='8' height='6' rx='1' fill='%2300d4ff'/%3E%3Crect x='38' y='82' width='24' height='4' rx='2' fill='%2300d4ff'/%3E%3C/svg%3E" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%231a1a2e'/%3E%3Ccircle cx='50' cy='38' r='16' fill='none' stroke='%2300d4ff' stroke-width='5'/%3E%3Crect x='45' y='54' width='10' height='14' rx='2' fill='%2300d4ff'/%3E%3Cpath d='M34 60 Q34 76 50 76 Q66 76 66 60' fill='none' stroke='%2300d4ff' stroke-width='5' stroke-linecap='round'/%3E%3Crect x='46' y='76' width='8' height='6' rx='1' fill='%2300d4ff'/%3E%3Crect x='38' y='82' width='24' height='4' rx='2' fill='%2300d4ff'/%3E%3C/svg%3E" />
+
+  <style>
+    /* ============================================================
+       BASE & RESET
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --surface2: #0f3460;
+      --accent: #00d4ff;
+      --accent-dim: #0099bb;
+      --text: #e0e0e0;
+      --text-dim: #8a8aaa;
+      --danger: #ff6b6b;
+      --success: #51cf66;
+      --radius: 12px;
+      --pad: 16px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      overscroll-behavior: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .app {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 12px var(--pad) var(--pad);
+      gap: 12px;
+    }
+
+    /* ============================================================
+       HEADER
+       ============================================================ */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.5px;
+    }
+
+    header h1 span {
+      color: var(--text-dim);
+      font-weight: 400;
+      font-size: 0.85rem;
+    }
+
+    /* ============================================================
+       CONFIG ROW (provider + key)
+       ============================================================ */
+    .config-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    select, input[type="password"] {
+      background: var(--surface);
+      border: 1.5px solid var(--surface2);
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+
+    select:focus, input[type="password"]:focus {
+      border-color: var(--accent);
+    }
+
+    select {
+      flex: 0 0 auto;
+      cursor: pointer;
+      padding-right: 32px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8aaa' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    .key-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    .key-wrapper input {
+      width: 100%;
+    }
+
+    .key-status {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.75rem;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .key-status.set { color: var(--success); }
+    .key-status.empty { color: var(--text-dim); }
+
+    /* ============================================================
+       DICTATION TEXTAREA
+       ============================================================ */
+    .dictation-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      min-height: 160px;
+      background: var(--surface);
+      border: 1.5px solid var(--surface2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 1rem;
+      line-height: 1.6;
+      padding: 14px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+      /* allow native speech-to-text on iOS */
+      -webkit-user-select: text;
+    }
+
+    textarea:focus { border-color: var(--accent-dim); }
+    textarea::placeholder { color: var(--text-dim); }
+
+    .char-count {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    /* ============================================================
+       FIX BUTTON
+       ============================================================ */
+    #fixBtn {
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #fixBtn:active { transform: scale(0.97); }
+    #fixBtn:disabled { background: var(--surface2); color: var(--text-dim); cursor: not-allowed; transform: none; }
+
+    #fixBtn.loading {
+      background: var(--accent-dim);
+      position: relative;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       OUTPUT AREA
+       ============================================================ */
+    .output-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .output-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+    }
+
+    .copy-badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--success);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .copy-badge.visible { opacity: 1; }
+
+    .output-box {
+      background: var(--surface);
+      border: 1.5px solid var(--surface2);
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 100px;
+      max-height: 45vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 1rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
+      cursor: pointer;
+      transition: border-color 0.2s;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .output-box:hover { border-color: var(--accent-dim); }
+
+    .output-box.empty {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .output-box.highlight {
+      border-color: var(--success);
+    }
+
+    /* ============================================================
+       DIFF SECTION
+       ============================================================ */
+    .diff-section {
+      border: 1.5px solid var(--surface2);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .diff-section summary {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      background: var(--surface);
+      user-select: none;
+      -webkit-user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .diff-section summary::-webkit-details-marker { display: none; }
+
+    .diff-section summary::before {
+      content: '▶';
+      font-size: 0.6rem;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    .diff-section[open] summary::before { transform: rotate(90deg); }
+
+    .diff-view {
+      padding: 14px;
+      font-size: 0.95rem;
+      line-height: 1.9;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 40vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: var(--surface);
+      border-top: 1px solid var(--surface2);
+    }
+
+    .diff-view del {
+      background: rgba(255, 107, 107, 0.22);
+      color: #ff8a8a;
+      text-decoration: line-through;
+      border-radius: 3px;
+      padding: 1px 3px;
+    }
+
+    .diff-view ins {
+      background: rgba(81, 207, 102, 0.18);
+      color: #51cf66;
+      text-decoration: none;
+      border-radius: 3px;
+      padding: 1px 3px;
+    }
+
+    .diff-section.hidden { display: none; }
+
+    /* ============================================================
+       ERROR TOAST
+       ============================================================ */
+    #errorToast {
+      display: none;
+      background: var(--danger);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (min-width: 480px) {
+      .app { padding-top: 20px; gap: 14px; }
+      textarea { min-height: 200px; }
+    }
+
+    @media (min-width: 720px) {
+      header h1 { font-size: 1.4rem; }
+      textarea { min-height: 240px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="100" height="100" rx="22" fill="#1a1a2e"/>
+      <circle cx="50" cy="38" r="16" fill="none" stroke="#00d4ff" stroke-width="5"/>
+      <rect x="45" y="54" width="10" height="14" rx="2" fill="#00d4ff"/>
+      <path d="M34 60 Q34 76 50 76 Q66 76 66 60" fill="none" stroke="#00d4ff" stroke-width="5" stroke-linecap="round"/>
+      <rect x="46" y="76" width="8" height="6" rx="1" fill="#00d4ff"/>
+      <rect x="38" y="82" width="24" height="4" rx="2" fill="#00d4ff"/>
+    </svg>
+    <h1>DictFix <span>— dictation corrector</span></h1>
+  </header>
+
+  <!-- CONFIG ROW -->
+  <div class="config-row">
+    <select id="providerSelect" aria-label="LLM Provider">
+      <option value="gemini">Gemini 2.5 Flash</option>
+      <option value="claude">Claude Haiku</option>
+      <option value="openai">GPT-4o-mini</option>
+    </select>
+
+    <div class="key-wrapper">
+      <input
+        type="password"
+        id="apiKey"
+        placeholder="API key…"
+        autocomplete="current-password"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label="API key"
+      />
+      <span class="key-status empty" id="keyStatus">—</span>
+    </div>
+  </div>
+
+  <!-- DICTATION INPUT -->
+  <div class="dictation-wrap">
+    <textarea
+      id="input"
+      placeholder="Dictate or paste text here…&#10;&#10;Tap the mic icon on your keyboard to speak."
+      aria-label="Dictation input"
+      spellcheck="false"
+    ></textarea>
+    <span class="char-count" id="charCount">0</span>
+  </div>
+
+  <!-- FIX BUTTON -->
+  <button id="fixBtn" aria-label="Fix dictation errors">Fix It</button>
+
+  <!-- ERROR TOAST -->
+  <div id="errorToast" role="alert" aria-live="polite"></div>
+
+  <!-- OUTPUT -->
+  <div class="output-section">
+    <div class="output-header">
+      <span class="output-label">Corrected</span>
+      <span class="copy-badge" id="copyBadge" aria-live="polite">Copied!</span>
+    </div>
+    <div
+      class="output-box empty"
+      id="output"
+      role="region"
+      aria-label="Corrected text"
+      tabindex="0"
+      title="Tap to copy"
+    >Corrected text will appear here…</div>
+  </div>
+
+  <!-- DIFF VIEW -->
+  <details class="diff-section hidden" id="diffSection">
+    <summary>Changes made</summary>
+    <div class="diff-view" id="diffView"></div>
+  </details>
+
+</div><!-- /.app -->
+
+<script>
+/* ============================================================
+   SYSTEM PROMPT
+   ============================================================ */
+const SYSTEM_PROMPT = `You are a voice dictation corrector. Your ONLY job is to fix obvious voice-to-text transcription errors in the text you receive.
+
+Make ONLY these corrections:
+- Fix homophones used incorrectly in context (their/there/they're, your/you're, its/it's, to/too/two, etc.)
+- Fix missing or clearly wrong punctuation where speech rhythm implies it
+- Fix obvious speech-to-text mishearings (e.g. "the new" instead of "than you", "eye" instead of "I")
+- Capitalize the first word of sentences and the pronoun "I"
+- Fix run-together words from dictation gaps
+
+NEVER do any of these:
+- Rephrase, reword, or restructure sentences
+- Improve clarity or flow
+- Change the formality or tone
+- Fix intentional grammar or stylistic choices
+- Add or remove content
+- Change informal language to formal
+- Alter paragraph breaks or spacing
+
+Output ONLY the corrected text. No explanations, no commentary, no quotes around the output. Preserve all line breaks exactly as given.`;
+
+/* ============================================================
+   PROVIDER MODULES
+   Each module exports: { name, call(apiKey, text) → Promise<string> }
+   ============================================================ */
+
+// ── MODULE: Google Gemini 1.5 Flash ──────────────────────────
+const GeminiProvider = {
+  name: 'Gemini 2.5 Flash',
+  model: 'gemini-2.5-flash',
+
+  async call(apiKey, text) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const body = {
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Gemini error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!content) throw new Error('Gemini returned an empty response.');
+    return content.trim();
+  }
+};
+
+// ── MODULE: Anthropic Claude Haiku ───────────────────────────
+const ClaudeProvider = {
+  name: 'Claude Haiku',
+  model: 'claude-haiku-4-5-20251001',
+
+  async call(apiKey, text) {
+    const url = 'https://api.anthropic.com/v1/messages';
+
+    const body = {
+      model: this.model,
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: text }]
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Claude error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const content = data?.content?.[0]?.text;
+    if (!content) throw new Error('Claude returned an empty response.');
+    return content.trim();
+  }
+};
+
+// ── MODULE: OpenAI GPT-4o-mini ────────────────────────────────
+const OpenAIProvider = {
+  name: 'GPT-4o-mini',
+  model: 'gpt-4o-mini',
+
+  async call(apiKey, text) {
+    const url = 'https://api.openai.com/v1/chat/completions';
+
+    const body = {
+      model: this.model,
+      temperature: 0.1,
+      max_tokens: 4096,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: text }
+      ]
+    };
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `OpenAI error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) throw new Error('OpenAI returned an empty response.');
+    return content.trim();
+  }
+};
+
+/* ============================================================
+   PROVIDER REGISTRY
+   To add a new provider: create a module above and add it here.
+   ============================================================ */
+const PROVIDERS = {
+  gemini: GeminiProvider,
+  claude: ClaudeProvider,
+  openai: OpenAIProvider
+};
+
+/* ============================================================
+   UI CONTROLLER
+   ============================================================ */
+(function () {
+  // Elements
+  const providerSelect = document.getElementById('providerSelect');
+  const apiKeyInput    = document.getElementById('apiKey');
+  const keyStatus      = document.getElementById('keyStatus');
+  const inputArea      = document.getElementById('input');
+  const charCount      = document.getElementById('charCount');
+  const fixBtn         = document.getElementById('fixBtn');
+  const outputBox      = document.getElementById('output');
+  const errorToast     = document.getElementById('errorToast');
+  const copyBadge      = document.getElementById('copyBadge');
+  const diffSection    = document.getElementById('diffSection');
+  const diffView       = document.getElementById('diffView');
+
+  // Session-only state (never persisted)
+  let currentKey = '';
+  let copyBadgeTimer = null;
+
+  // ── Auto-focus input on load ──────────────────────────────
+  window.addEventListener('load', () => {
+    inputArea.focus();
+  });
+
+  // ── Char counter ─────────────────────────────────────────
+  inputArea.addEventListener('input', () => {
+    charCount.textContent = inputArea.value.length.toLocaleString();
+  });
+
+  // ── API key handling (memory only) ───────────────────────
+  apiKeyInput.addEventListener('input', () => {
+    currentKey = apiKeyInput.value.trim();
+    if (currentKey) {
+      keyStatus.textContent = '✓';
+      keyStatus.className = 'key-status set';
+    } else {
+      keyStatus.textContent = '—';
+      keyStatus.className = 'key-status empty';
+    }
+    hideError();
+  });
+
+  // ── Fix button ───────────────────────────────────────────
+  fixBtn.addEventListener('click', handleFix);
+
+  // Allow Cmd+Enter / Ctrl+Enter to submit
+  inputArea.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleFix();
+  });
+
+  async function handleFix() {
+    const text = inputArea.value.trim();
+    if (!text) { showError('Please enter some text to fix.'); return; }
+    if (!currentKey) { showError('Enter your API key first.'); apiKeyInput.focus(); return; }
+
+    const providerKey = providerSelect.value;
+    const provider = PROVIDERS[providerKey];
+    if (!provider) { showError('Unknown provider selected.'); return; }
+
+    setLoading(true);
+    hideError();
+
+    try {
+      const corrected = await provider.call(currentKey, text);
+      displayOutput(corrected);
+      renderDiff(text, corrected);
+      clearInput();
+      await copyToClipboard(corrected);
+    } catch (err) {
+      showError(err.message || 'An error occurred. Check your API key and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Output & copy ────────────────────────────────────────
+  function displayOutput(text) {
+    outputBox.textContent = text;
+    outputBox.classList.remove('empty', 'highlight');
+    void outputBox.offsetWidth; // reflow for animation
+    outputBox.classList.add('highlight');
+    setTimeout(() => outputBox.classList.remove('highlight'), 1200);
+  }
+
+  // ── Clear input ───────────────────────────────────────────
+  function clearInput() {
+    inputArea.value = '';
+    charCount.textContent = '0';
+  }
+
+  // ── Diff rendering ────────────────────────────────────────
+  function renderDiff(original, corrected) {
+    const changes = Diff.diffWords(original, corrected);
+    diffView.innerHTML = changes.map(({ added, removed, value }) => {
+      const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (added)   return `<ins>${escaped}</ins>`;
+      if (removed) return `<del>${escaped}</del>`;
+      return escaped;
+    }).join('');
+    diffSection.classList.remove('hidden');
+  }
+
+  async function copyToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older Safari
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      showCopyBadge();
+    } catch (_) {
+      // Clipboard can fail if document is not focused; output is still shown
+    }
+  }
+
+  outputBox.addEventListener('click', () => {
+    const text = outputBox.textContent;
+    if (text && !outputBox.classList.contains('empty')) {
+      copyToClipboard(text);
+    }
+  });
+
+  function showCopyBadge() {
+    copyBadge.classList.add('visible');
+    clearTimeout(copyBadgeTimer);
+    copyBadgeTimer = setTimeout(() => copyBadge.classList.remove('visible'), 2000);
+  }
+
+  // ── Loading state ────────────────────────────────────────
+  function setLoading(on) {
+    fixBtn.disabled = on;
+    if (on) {
+      fixBtn.classList.add('loading');
+      fixBtn.innerHTML = '<span class="spinner"></span>Fixing…';
+    } else {
+      fixBtn.classList.remove('loading');
+      fixBtn.textContent = 'Fix It';
+    }
+  }
+
+  // ── Error handling ───────────────────────────────────────
+  function showError(msg) {
+    errorToast.style.display = 'block';
+    errorToast.textContent = msg;
+  }
+
+  function hideError() {
+    errorToast.style.display = 'none';
+    errorToast.textContent = '';
+  }
+
+})();
+</script>
+</body>
+</html>
