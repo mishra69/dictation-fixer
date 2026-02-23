@@ -370,6 +370,8 @@
       padding: 1px 3px;
     }
 
+    .diff-view a { color: var(--accent); }
+
     .diff-section.hidden { display: none; }
 
     /* ============================================================
@@ -473,6 +475,28 @@
   <details class="diff-section hidden" id="diffSection">
     <summary>Changes made</summary>
     <div class="diff-view" id="diffView"></div>
+  </details>
+
+  <!-- ABOUT -->
+  <details class="diff-section">
+    <summary>About &amp; how to use</summary>
+    <div class="diff-view" style="line-height:1.7; color: var(--text);">
+      <strong style="color:var(--accent)">What is this?</strong><br>
+      DictFix cleans up voice dictation errors while keeping your writing exactly as you intended. It fixes the mistakes your phone's speech-to-text makes — wrong homophones, missing punctuation, misheared words — without rephrasing anything or changing your tone.<br><br>
+
+      <strong style="color:var(--accent)">Why?</strong><br>
+      Dictation is fast, but the output is messy. Editing it by hand defeats the purpose. DictFix does the cleanup in one tap so you can paste clean text straight into wherever you need it.<br><br>
+
+      <strong style="color:var(--accent)">How to use</strong><br>
+      1. Pick a provider and paste your API key into the key field.<br>
+      2. Dictate or paste your text into the main box.<br>
+      3. Tap <strong>Fix It</strong>.<br>
+      4. Corrected text appears below. Tap <strong>Copy</strong> to copy it.<br>
+      5. Expand <em>Changes made</em> to see exactly what was fixed.<br><br>
+
+      <strong style="color:var(--accent)">API keys</strong><br>
+      You need a key from one of the three providers. Gemini 2.5 Flash has a free tier — get a key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com</a>. Your key is never stored — it lives in memory for the current session only.
+    </div>
   </details>
 
 </div><!-- /.app -->
